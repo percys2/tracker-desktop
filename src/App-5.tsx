@@ -664,10 +664,10 @@ function App() {
                           Fecha: {new Date(cliente.fecha_creacion).toLocaleString()}
                         </p>
                         <a 
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${Number(cliente.latitud).toFixed(6)},${Number(cliente.longitud).toFixed(6)}`}
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${cliente.latitud},${cliente.longitud}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ backgroundColor: '#38bdf8', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '14px', display: 'inline-block', marginTop: '8px', textDecoration: 'none' }}
+                          className="mt-2 inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
                         >
                           Como llegar
                         </a>
@@ -1019,10 +1019,10 @@ function App() {
                               Fecha: {new Date(cliente.fecha_creacion).toLocaleString()}
                             </p>
                             <a 
-                              href={`https://www.google.com/maps/dir/?api=1&destination=${Number(cliente.latitud).toFixed(6)},${Number(cliente.longitud).toFixed(6)}`}
+                              href={`https://www.google.com/maps/dir/?api=1&destination=${cliente.latitud},${cliente.longitud}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{ backgroundColor: '#38bdf8', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '14px', display: 'inline-block', marginTop: '8px', textDecoration: 'none' }}
+                              className="mt-2 inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
                             >
                               Como llegar
                             </a>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -13,6 +13,7 @@ import { Users, MapPin, Plus, Trash2, Edit, RefreshCw, ClipboardList, ShoppingCa
 import { supabase } from '@/lib/supabase'
 
 const NICARAGUA_CENTER: [number, number] = [12.1364, -86.2514]
+const MAPBOX_TOKEN = 'pk.eyJ1IjoicGVyY3lzY2FzdGlsbG8iLCJhIjoiY2wxcGFyYWttMDhkOTNjb2Q5anJkY3B2dyJ9.aAXVPRNQ4e2ifF20zjQbsQ'
 
 interface Vendedor {
   id: number
@@ -104,12 +105,17 @@ L.Marker.prototype.options.icon = defaultIcon
 
 function MapUpdater({ vendedores }: { vendedores: Vendedor[] }) {
   const map = useMap()
+  const hasFittedBounds = useRef(false)
   
   useEffect(() => {
+    // Solo ajustar el zoom la primera vez que hay vendedores con ubicacion
+    if (hasFittedBounds.current) return
+    
     const withLocation = vendedores.filter(p => p.latitud && p.longitud)
     if (withLocation.length > 0) {
       const bounds = L.latLngBounds(withLocation.map(p => [p.latitud!, p.longitud!]))
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 })
+      hasFittedBounds.current = true
     }
   }, [vendedores, map])
   
@@ -616,8 +622,8 @@ function App() {
             <div style={{ height: '100%', width: '100%' }}>
               <MapContainer center={NICARAGUA_CENTER} zoom={8} style={{ height: '100%', width: '100%' }}>
                 <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; <a href="https://www.mapbox.com/">Mapbox</a>'
+                  url={`https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`}
                 />
                 <MapUpdater vendedores={vendedoresConUbicacion} />
                 {vendedoresConUbicacion.map(vendedor => (
@@ -657,6 +663,14 @@ function App() {
                         <p className="text-xs text-gray-400">
                           Fecha: {new Date(cliente.fecha_creacion).toLocaleString()}
                         </p>
+                        <a 
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${Number(cliente.latitud).toFixed(6)},${Number(cliente.longitud).toFixed(6)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ backgroundColor: '#38bdf8', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '14px', display: 'inline-block', marginTop: '8px', textDecoration: 'none' }}
+                        >
+                          Como llegar
+                        </a>
                       </div>
                     </Popup>
                   </Marker>
@@ -1004,6 +1018,14 @@ function App() {
                             <p className="text-xs text-gray-400">
                               Fecha: {new Date(cliente.fecha_creacion).toLocaleString()}
                             </p>
+                            <a 
+                              href={`https://www.google.com/maps/dir/?api=1&destination=${Number(cliente.latitud).toFixed(6)},${Number(cliente.longitud).toFixed(6)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ backgroundColor: '#38bdf8', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '14px', display: 'inline-block', marginTop: '8px', textDecoration: 'none' }}
+                            >
+                              Como llegar
+                            </a>
                           </div>
                         </div>
                       ))}
