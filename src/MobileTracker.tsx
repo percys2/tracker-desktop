@@ -128,7 +128,7 @@ function MobileTracker() {
         setStatus('error')
         setMessage('Error al enviar ubicación')
       }
-    } catch (error) {
+    } catch {
       setStatus('error')
       setMessage('Error de conexión')
     }
@@ -264,7 +264,7 @@ function MobileTracker() {
         setMessage('Error al registrar visita')
         setStatus('error')
       }
-    } catch (error) {
+    } catch {
       setMessage('Error de conexión')
       setStatus('error')
     }
@@ -297,7 +297,7 @@ function MobileTracker() {
         setMessage('Error al registrar pedido')
         setStatus('error')
       }
-    } catch (error) {
+    } catch {
       setMessage('Error de conexión')
       setStatus('error')
     }
@@ -313,7 +313,7 @@ function MobileTracker() {
       fetchMyVisits()
       setMessage('Visita completada')
       setStatus('success')
-    } catch (error) {
+    } catch {
       setMessage('Error al completar visita')
       setStatus('error')
     }
@@ -329,7 +329,7 @@ function MobileTracker() {
       fetchMyOrders()
       setMessage('Pedido completado')
       setStatus('success')
-    } catch (error) {
+    } catch {
       setMessage('Error al completar pedido')
       setStatus('error')
     }

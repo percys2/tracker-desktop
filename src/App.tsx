@@ -187,7 +187,7 @@ function App() {
         .order('fecha_creacion', { ascending: false })
       
       if (error) throw error
-      const visitasConNombre = (data || []).map((v: any) => ({
+      const visitasConNombre = (data || []).map((v: VisitaConNombre & { vendedores?: { nombre: string } }) => ({
         ...v,
         nombre_vendedor: v.vendedores?.nombre || 'Desconocido'
       }))
@@ -205,7 +205,7 @@ function App() {
         .order('fecha_creacion', { ascending: false })
       
       if (error) throw error
-      const pedidosConNombre = (data || []).map((p: any) => ({
+      const pedidosConNombre = (data || []).map((p: PedidoConNombre & { vendedores?: { nombre: string } }) => ({
         ...p,
         nombre_vendedor: p.vendedores?.nombre || 'Desconocido'
       }))
@@ -223,7 +223,7 @@ function App() {
         .order('fecha_creacion', { ascending: false })
       
       if (error) throw error
-      const clientesConNombre = (data || []).map((c: any) => ({
+      const clientesConNombre = (data || []).map((c: Cliente & { vendedores?: { nombre: string } }) => ({
         ...c,
         nombre_vendedor: c.vendedores?.nombre || 'Desconocido'
       }))
@@ -249,7 +249,7 @@ function App() {
     const ubicacionesChannel = supabase
       .channel('ubicaciones-changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ubicaciones' }, async (payload) => {
-        const ubicacion = payload.new as any
+        const ubicacion = payload.new as { vendedor_id: number; latitud: number; longitud: number }
         await supabase
           .from('vendedores')
           .update({ 
@@ -381,7 +381,7 @@ function App() {
   
   const handleUpdateVisitStatus = async (id: number, estado: string) => {
     try {
-      const updateData: any = { estado }
+      const updateData: { estado: string; fecha_completado?: string } = { estado }
       if (estado === 'completada') {
         updateData.fecha_completado = new Date().toISOString()
       }
