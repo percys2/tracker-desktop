@@ -9,11 +9,12 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Users, MapPin, Plus, Trash2, Edit, RefreshCw, ClipboardList, ShoppingCart, Map, Menu, X, UserCheck } from 'lucide-react'
+import { Users, MapPin, Plus, Trash2, Edit, RefreshCw, ClipboardList, ShoppingCart, Map, Menu, X, UserCheck, Download, Route } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import * as XLSX from 'xlsx'
 
 const NICARAGUA_CENTER: [number, number] = [12.1364, -86.2514]
-const MAPBOX_TOKEN = 'pk.eyJ1IjoicGVyY3lzY2FzdGlsbG8iLCJhIjoiY2wxcGFyYWttMDhkOTNjb2Q5anJkY3B2dyJ9.aAXVPRNQ4e2ifF20zjQbsQ'
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoicGVyY3lzY2FzdGlsbG8iLCJhIjoiY2wxcGFyYWttMDhkOTNjb2Q5anJkY3B2dyJ9.aAXVPRNQ4e2ifF20zjQbsQ'
 
 interface Vendedor {
   id: number
@@ -62,6 +63,9 @@ interface Cliente {
   notas: string | null
   fecha_creacion: string
   nombre_vendedor?: string
+  tipo_animal?: string | null
+  cantidad_animales?: number | null
+  administracion?: string | null
 }
 
 const defaultIcon = L.icon({
@@ -136,8 +140,12 @@ function App() {
   const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false)
   const [isVisitDialogOpen, setIsVisitDialogOpen] = useState(false)
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false)
+    const [isClienteDetailDialogOpen, setIsClienteDetailDialogOpen] = useState(false)
+    const [isSelectVendedorLocationDialogOpen, setIsSelectVendedorLocationDialogOpen] = useState(false)
+    const [selectedVendedorForLocation, setSelectedVendedorForLocation] = useState<string>('')
   
-  const [selectedVendedor, setSelectedVendedor] = useState<Vendedor | null>(null)
+    const [selectedVendedor, setSelectedVendedor] = useState<Vendedor | null>(null)
+  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null)
   
   const [formData, setFormData] = useState({
     nombre: '',
@@ -187,7 +195,7 @@ function App() {
         .order('fecha_creacion', { ascending: false })
       
       if (error) throw error
-      const visitasConNombre = (data || []).map((v: VisitaConNombre & { vendedores?: { nombre: string } }) => ({
+      const visitasConNombre = (data || []).map((v: any) => ({
         ...v,
         nombre_vendedor: v.vendedores?.nombre || 'Desconocido'
       }))
@@ -205,7 +213,7 @@ function App() {
         .order('fecha_creacion', { ascending: false })
       
       if (error) throw error
-      const pedidosConNombre = (data || []).map((p: PedidoConNombre & { vendedores?: { nombre: string } }) => ({
+      const pedidosConNombre = (data || []).map((p: any) => ({
         ...p,
         nombre_vendedor: p.vendedores?.nombre || 'Desconocido'
       }))
@@ -223,7 +231,7 @@ function App() {
         .order('fecha_creacion', { ascending: false })
       
       if (error) throw error
-      const clientesConNombre = (data || []).map((c: Cliente & { vendedores?: { nombre: string } }) => ({
+      const clientesConNombre = (data || []).map((c: any) => ({
         ...c,
         nombre_vendedor: c.vendedores?.nombre || 'Desconocido'
       }))
@@ -249,7 +257,7 @@ function App() {
     const ubicacionesChannel = supabase
       .channel('ubicaciones-changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ubicaciones' }, async (payload) => {
-        const ubicacion = payload.new as { vendedor_id: number; latitud: number; longitud: number }
+        const ubicacion = payload.new as any
         await supabase
           .from('vendedores')
           .update({ 
@@ -381,7 +389,7 @@ function App() {
   
   const handleUpdateVisitStatus = async (id: number, estado: string) => {
     try {
-      const updateData: { estado: string; fecha_completado?: string } = { estado }
+      const updateData: any = { estado }
       if (estado === 'completada') {
         updateData.fecha_completado = new Date().toISOString()
       }
@@ -477,6 +485,58 @@ function App() {
       console.error('Error deleting cliente:', error)
     }
   }
+  
+  const exportClientesToExcel = () => {
+    if (clientes.length === 0) {
+      alert('No hay clientes para exportar')
+      return
+    }
+    
+    const dataToExport = clientes.map(c => ({
+      'Nombre': c.nombre,
+      'Direccion': c.direccion || '',
+      'Telefono': c.telefono || '',
+      'Latitud': c.latitud,
+      'Longitud': c.longitud,
+      'Notas': c.notas || '',
+      'Registrado Por': c.nombre_vendedor || '',
+      'Fecha Registro': new Date(c.fecha_creacion).toLocaleString()
+    }))
+    
+    const ws = XLSX.utils.json_to_sheet(dataToExport)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Clientes')
+    
+    // Ajustar ancho de columnas
+    ws['!cols'] = [
+      { wch: 25 }, // Nombre
+      { wch: 40 }, // Direccion
+      { wch: 15 }, // Telefono
+      { wch: 12 }, // Latitud
+      { wch: 12 }, // Longitud
+      { wch: 30 }, // Notas
+      { wch: 20 }, // Registrado Por
+      { wch: 20 }, // Fecha Registro
+    ]
+    
+    XLSX.writeFile(wb, `clientes_${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
+  
+  const openOptimizedRoute = () => {
+    if (clientes.length === 0) {
+      alert('No hay clientes para crear ruta')
+      return
+    }
+    
+    // Crear URL de Google Maps con multiples destinos
+    // Google Maps permite hasta 10 waypoints en la URL gratuita
+    const waypoints = clientes.slice(0, 10).map(c => `${c.latitud},${c.longitud}`).join('/')
+    
+    // URL formato: origin/waypoint1/waypoint2/.../destination
+    const url = `https://www.google.com/maps/dir/${NICARAGUA_CENTER[0]},${NICARAGUA_CENTER[1]}/${waypoints}`
+    
+    window.open(url, '_blank')
+  }
 
   const openEditDialog = (vendedor: Vendedor) => {
     setSelectedVendedor(vendedor)
@@ -491,20 +551,58 @@ function App() {
     setIsEditDialogOpen(true)
   }
 
-  const openLocationDialog = (vendedor: Vendedor) => {
-    setSelectedVendedor(vendedor)
-    setFormData({
-      nombre: '',
-      telefono: '',
-      correo: '',
-      latitud: vendedor.latitud?.toString() || '',
-      longitud: vendedor.longitud?.toString() || '',
-      estado: ''
-    })
-    setIsLocationDialogOpen(true)
-  }
+    const openLocationDialog = (vendedor: Vendedor) => {
+      setSelectedVendedor(vendedor)
+      setFormData({
+        nombre: '',
+        telefono: '',
+        correo: '',
+        latitud: vendedor.latitud?.toString() || '',
+        longitud: vendedor.longitud?.toString() || '',
+        estado: ''
+      })
+      setIsLocationDialogOpen(true)
+    }
 
-  const vendedoresConUbicacion = vendedores.filter(p => p.latitud && p.longitud)
+    const handleRequestLocationWithVendor = () => {
+      if (!selectedVendedorForLocation) return
+    
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords
+            try {
+              const { error } = await supabase
+                .from('vendedores')
+                .update({
+                  latitud: latitude,
+                  longitud: longitude,
+                  ultima_actualizacion: new Date().toISOString()
+                })
+                .eq('id', parseInt(selectedVendedorForLocation))
+            
+              if (error) throw error
+              fetchVendedores()
+              setIsSelectVendedorLocationDialogOpen(false)
+              setSelectedVendedorForLocation('')
+              alert('Ubicacion registrada exitosamente')
+            } catch (error) {
+              console.error('Error updating location:', error)
+              alert('Error al registrar la ubicacion')
+            }
+          },
+          (error) => {
+            console.error('Error getting location:', error)
+            alert('No se pudo obtener la ubicacion. Por favor, verifique los permisos de ubicacion.')
+          },
+          { enableHighAccuracy: true }
+        )
+      } else {
+        alert('La geolocalizacion no esta soportada en este navegador.')
+      }
+    }
+
+    const vendedoresConUbicacion = vendedores.filter(p => p.latitud && p.longitud)
   const vendedoresActivos = vendedores.filter(p => p.estado === 'activo')
   const totalVentas = pedidos.reduce((sum, o) => sum + (o.monto_total || 0), 0)
 
@@ -572,9 +670,39 @@ function App() {
                 <span>{item.label}</span>
               </button>
             ))}
-          </nav>
+                    </nav>
           
-          <div style={{ marginTop: 'auto', padding: '16px', backgroundColor: '#16213e', borderRadius: '8px' }}>
+                    <div style={{ marginTop: '16px' }}>
+                      <button
+                        onClick={() => setIsSelectVendedorLocationDialogOpen(true)}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '12px 16px',
+                          borderRadius: '8px',
+                          border: '2px dashed #10b981',
+                          cursor: 'pointer',
+                          backgroundColor: 'transparent',
+                          color: '#10b981',
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.1)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent'
+                        }}
+                      >
+                        <MapPin style={{ height: '20px', width: '20px' }} />
+                        <span>Registrar Ubicacion</span>
+                      </button>
+                    </div>
+          
+                    <div style={{ marginTop: 'auto', padding: '16px', backgroundColor: '#16213e', borderRadius: '8px' }}>
             <h3 style={{ fontWeight: 600, marginBottom: '12px', color: 'white', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Estadisticas</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -664,12 +792,12 @@ function App() {
                           Fecha: {new Date(cliente.fecha_creacion).toLocaleString()}
                         </p>
                         <a 
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${cliente.latitud},${cliente.longitud}`}
+                          href={`https://www.google.com/maps/search/?api=1&query=${Number(cliente.latitud).toFixed(6)}%2C${Number(cliente.longitud).toFixed(6)}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="mt-2 inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
+                          style={{ backgroundColor: '#38bdf8', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '14px', display: 'inline-block', marginTop: '8px', textDecoration: 'none' }}
                         >
-                          Como llegar
+                          Ver en Google Maps
                         </a>
                       </div>
                     </Popup>
@@ -979,6 +1107,16 @@ function App() {
                     <UserCheck className="h-5 w-5 text-blue-500" />
                     Clientes Registrados ({clientes.length})
                   </CardTitle>
+                  <div className="flex gap-2">
+                    <Button onClick={exportClientesToExcel} className="bg-green-600 hover:bg-green-700">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar Excel
+                    </Button>
+                    <Button onClick={openOptimizedRoute} className="bg-blue-600 hover:bg-blue-700">
+                      <Route className="h-4 w-4 mr-2" />
+                      Ruta Optimizada
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {clientes.length === 0 ? (
@@ -1018,14 +1156,26 @@ function App() {
                             <p className="text-xs text-gray-400">
                               Fecha: {new Date(cliente.fecha_creacion).toLocaleString()}
                             </p>
-                            <a 
-                              href={`https://www.google.com/maps/dir/?api=1&destination=${cliente.latitud},${cliente.longitud}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-2 inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
-                            >
-                              Como llegar
-                            </a>
+                            <div className="flex gap-2 mt-2">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedCliente(cliente)
+                                  setIsClienteDetailDialogOpen(true)
+                                }}
+                              >
+                                Ver mas informacion
+                              </Button>
+                              <a 
+                                href={`https://www.google.com/maps/search/?api=1&query=${Number(cliente.latitud).toFixed(6)}%2C${Number(cliente.longitud).toFixed(6)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ backgroundColor: '#38bdf8', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '14px', display: 'inline-block', textDecoration: 'none' }}
+                              >
+                                Ver en Google Maps
+                              </a>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -1094,6 +1244,128 @@ function App() {
             </div>
             <Button className="w-full" onClick={handleUpdateLocation} disabled={!formData.latitud || !formData.longitud}>
               Actualizar Ubicacion
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isClienteDetailDialogOpen} onOpenChange={setIsClienteDetailDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Informacion del Cliente</DialogTitle>
+          </DialogHeader>
+          {selectedCliente && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-bold text-lg text-blue-700 mb-2">{selectedCliente.nombre}</h3>
+                
+                {selectedCliente.direccion && (
+                  <p className="text-sm text-gray-600 mb-1">
+                    <span className="font-semibold">Direccion:</span> {selectedCliente.direccion}
+                  </p>
+                )}
+                
+                {selectedCliente.telefono && (
+                  <p className="text-sm text-gray-600 mb-1">
+                    <span className="font-semibold">Telefono:</span> {selectedCliente.telefono}
+                  </p>
+                )}
+                
+                {selectedCliente.notas && (
+                  <p className="text-sm text-gray-600 mb-1">
+                    <span className="font-semibold">Notas:</span> {selectedCliente.notas}
+                  </p>
+                )}
+              </div>
+              
+              <div className="bg-green-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-green-700 mb-2">Informacion de la Granja</h4>
+                
+                <p className="text-sm text-gray-600 mb-1">
+                  <span className="font-semibold">Tipo de Animal:</span>{' '}
+                  {selectedCliente.tipo_animal === 'ganado_bovino' ? 'Ganado Bovino' :
+                   selectedCliente.tipo_animal === 'ganado_porcino' ? 'Ganado Porcino' :
+                   selectedCliente.tipo_animal === 'aves' ? 'Aves (Pollos/Gallinas)' :
+                   selectedCliente.tipo_animal === 'caprino' ? 'Caprino (Cabras)' :
+                   selectedCliente.tipo_animal === 'ovino' ? 'Ovino (Ovejas)' :
+                   selectedCliente.tipo_animal === 'equino' ? 'Equino (Caballos)' :
+                   selectedCliente.tipo_animal === 'peces' ? 'Peces' :
+                   selectedCliente.tipo_animal === 'otro' ? 'Otro' :
+                   selectedCliente.tipo_animal || 'No especificado'}
+                </p>
+                
+                <p className="text-sm text-gray-600 mb-1">
+                  <span className="font-semibold">Cantidad de Animales:</span>{' '}
+                  {selectedCliente.cantidad_animales || 'No especificado'}
+                </p>
+                
+                <p className="text-sm text-gray-600 mb-1">
+                  <span className="font-semibold">Administracion:</span>{' '}
+                  {selectedCliente.administracion === 'propia' ? 'Lo administra el mismo' :
+                   selectedCliente.administracion === 'delegada' ? 'Delega a alguien mas' :
+                   selectedCliente.administracion || 'No especificado'}
+                </p>
+              </div>
+              
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-gray-700 mb-2">Ubicacion y Registro</h4>
+                
+                <p className="text-sm text-gray-600 mb-1">
+                  <span className="font-semibold">Coordenadas:</span>{' '}
+                  {selectedCliente.latitud.toFixed(6)}, {selectedCliente.longitud.toFixed(6)}
+                </p>
+                
+                <p className="text-sm text-gray-600 mb-1">
+                  <span className="font-semibold">Registrado por:</span>{' '}
+                  {selectedCliente.nombre_vendedor || 'Desconocido'}
+                </p>
+                
+                <p className="text-sm text-gray-600">
+                  <span className="font-semibold">Fecha de registro:</span>{' '}
+                  {new Date(selectedCliente.fecha_creacion).toLocaleString()}
+                </p>
+              </div>
+              
+              <Button 
+                className="w-full" 
+                onClick={() => setIsClienteDetailDialogOpen(false)}
+              >
+                Cerrar
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isSelectVendedorLocationDialogOpen} onOpenChange={setIsSelectVendedorLocationDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Seleccionar Vendedor para Registrar Ubicacion</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">
+              Seleccione el vendedor cuya ubicacion desea registrar. Se solicitara acceso a su ubicacion actual.
+            </p>
+            <div>
+              <Label>Vendedor *</Label>
+              <Select value={selectedVendedorForLocation} onValueChange={setSelectedVendedorForLocation}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar vendedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vendedores.map(v => (
+                    <SelectItem key={v.id} value={v.id.toString()}>{v.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button 
+              className="w-full" 
+              onClick={handleRequestLocationWithVendor} 
+              disabled={!selectedVendedorForLocation}
+            >
+              <MapPin className="h-4 w-4 mr-2" />
+              Obtener y Registrar Ubicacion
             </Button>
           </div>
         </DialogContent>
